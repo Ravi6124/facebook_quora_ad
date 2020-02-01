@@ -20,13 +20,13 @@ import org.springframework.web.servlet.view.RedirectView;
  
 
 import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
 import java.util.List;
 
 
 @CrossOrigin(origins =  "*", allowedHeaders = "*")
 @RequestMapping("/ads")
 @RestController
-@CrossOrigin(origins = "*",allowedHeaders = "*")
 public class AdController {
 
     @Autowired
@@ -35,30 +35,22 @@ public class AdController {
     @Autowired
     private UserCacheService userCacheService;
 
-//    @Autowired
-//    private TrendingCacheService trendingCacheService;
 
 
-    @Autowired
-    AdRepository adRepository;
 
-    @Autowired
-    CategoryRepository categoryRepository;
+//    @PostMapping("/onclick")
+//    public RedirectView onClick(@Valid @RequestBody OnClickRequest onClickRequest){
+//
+//        adService.onClick(onClickRequest);
+//        return new RedirectView(onClickRequest.getTargetUrl());
+//
+//    }
 
-
-    @GetMapping("/getAds/{userId}")
-   public List<Ad> getAds(@PathVariable(value = "userId") String userId )
-    {
-        return null; // to skip compilation errors
-
-    }
-
-    @GetMapping("/onclick")
-    public RedirectView onClick(@Valid @RequestBody OnClickRequest onClickRequest){
+    @PostMapping("/onclick")
+    public String onClick(@Valid @RequestBody OnClickRequest onClickRequest){
 
         adService.onClick(onClickRequest);
-        return new RedirectView(onClickRequest.getTargetUrl());
-
+        return  onClickRequest.getTargetUrl();
     }
 
     @PostMapping("/postads")
@@ -70,29 +62,47 @@ public class AdController {
 
 
 
+    @GetMapping("/tags")
+    public ResponseEntity<List<String>> getTags(){
+
+        return new ResponseEntity<>(adService.getTags(),HttpStatus.OK);
+
+    }
+
     @GetMapping("/categories")
-    public ResponseEntity<List<CategoryDTO>> getCategories(){
-
+    public  ResponseEntity<List<CategoryDTO>> getCategories(){
         return new ResponseEntity<>(adService.getCategories(),HttpStatus.OK);
-
     }
 
-    @GetMapping("/findAds/{tag}")
-    public List<Ad> findByTag(@PathVariable(value = "tag") String tag){
+//    @GetMapping("/findAds/{tag}")
+//    public List<Ad> findByTag(@PathVariable(value = "tag") String tag){
+//
+//        return adRepository.findByTag(tag);
+//
+//
+//    }
 
-        return adRepository.findByTag(tag);
 
 
-    }
-
-
-
-    public ResponseEntity<List<Ad>> getAds(@PathVariable(value = "userId") String userId )
+    @GetMapping(value = "getAds/{userId}")
+    public ResponseEntity<List<Ad>> getAds(@NotNull @PathVariable(value = "userId") String userId )
     {
-        UserCache userCache = adService.getAds(userId);
+        //TODO : recieve the access token filter the userId and pass it to the function
+
+
+        UserCache userCache = adService.getAds(adService.getUserId(userId));
         return new ResponseEntity<>(userCache.getAds(),HttpStatus.OK);
 
     }
+
+    @GetMapping(value = "{token}")
+    public String getUserId(@PathVariable(value = "token") String token){
+
+        return adService.getUserId(token);
+    }
+
+
+
 
 
 

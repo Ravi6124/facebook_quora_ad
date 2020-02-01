@@ -17,9 +17,11 @@ public class OnClickRequest {
     @NotNull
     String adId;
     @NotNull
+    String tag;
+    @NotNull
     String advertiserId;
     @NotNull
-    String categoryId;
+    String categoryName;
     @NotNull
     String userId;
     String description;

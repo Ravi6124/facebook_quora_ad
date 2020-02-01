@@ -7,26 +7,28 @@ import com.example.AdService.dto.CategoryDTO;
 import com.example.AdService.dto.onclickapi.OnClickRequest;
 
 import com.example.AdService.document.UserCache;
+import com.example.AdService.feignclient.AnalyticsClient;
 import com.example.AdService.repository.AdRepository;
 import com.example.AdService.repository.CategoryRepository;
 import com.example.AdService.services.AdService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-
-import java.util.Arrays;
-import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.*;
 
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.TimeToLive;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Iterator;
+import javax.xml.bind.DatatypeConverter;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class AdServiceImpl implements AdService {
@@ -41,13 +43,23 @@ public class AdServiceImpl implements AdService {
     @Autowired
     KafkaTemplate<String,OnClickRequest> kafkaTemplate;
 
+    @Autowired
+    AnalyticsClient analyticsClient;
+
+    @Value("${jwt.secret}")
+    private  String SECRET_KEY;
 
 
+    private static final String IMAGE_PATTERN =
+            "([^\\s]+(\\.(?i)(jpg|png|gif|bmp|jpeg))$)";
 
+    private Matcher matcher;
+    private Pattern pattern;
 
     @Override
     public void onClick(OnClickRequest onClickRequest) {
 
+        onClickRequest.setUserId(getUserId(onClickRequest.getUserId()));
         sendOnclick(onClickRequest);
 
 
@@ -56,8 +68,12 @@ public class AdServiceImpl implements AdService {
     @Override
     public String addAd(AdDTO adDTO) {
 
-        Ad ad = new Ad();
+        String imageUrl = adDTO.getImageUrl();
+        matcher = pattern.matcher(imageUrl);
+        if(!matcher.matches() || adDTO.getImageUrl().equals(adDTO.getTargetUrl()))
+            return "false";
 
+        Ad ad = new Ad();
         BeanUtils.copyProperties(adDTO,ad);
         return adRepository.save(ad).toString();
 
@@ -83,9 +99,25 @@ public class AdServiceImpl implements AdService {
         List<CategoryDTO> categoryDTOS = Arrays.asList(modelMapper.map(categories, CategoryDTO[].class));
 
         return categoryDTOS;
-
     }
 
+    @Override
+    public List<String> getTags() {
+        ModelMapper modelMapper = new ModelMapper();
+
+        List<Category> categories = categoryRepository.findAll();
+
+        List<CategoryDTO> categoryDTOS = Arrays.asList(modelMapper.map(categories, CategoryDTO[].class));
+
+
+        List<String> tags = new ArrayList<>();
+        for(int i=0;i<categories.size();i++){
+            tags.addAll(categoryDTOS.get(i).getTags());
+        }
+        //return categoryDTOS;
+
+        return  tags;
+    }
 
     public void sendOnclick(OnClickRequest onClickRequest){
 
@@ -98,6 +130,14 @@ public class AdServiceImpl implements AdService {
     public List<Ad> findByTag(String tag) {
         return adRepository.findByTag(tag);
         //return adRepository.findAll(tags);
+    }
+
+    public  String getUserId(String jwt) {
+        //This line will throw an exception if it is not a signed JWS (as expected)
+        Claims claims = Jwts.parser()
+                .setSigningKey(DatatypeConverter.parseBase64Binary(SECRET_KEY))
+                .parseClaimsJws(jwt).getBody();
+        return claims.get("userId").toString();
     }
 
 
@@ -113,8 +153,16 @@ public class AdServiceImpl implements AdService {
         //Todo : use a feign client to call the finction to get user specific tags
         List<Ad> finalAds = new ArrayList<>();
         List<String> tags = new ArrayList<>();
-        tags.add("Clothing");
-        tags.add("Cricket");
+//        tags.addAll(analyticsClient.findActionListByUserId(userId));
+
+        //TODO: ADD RADOM TAGS WHEN WE DON'T GET ANY INTERESTS
+//        tags.add("Clothing");
+//        tags.add("Cricket");
+//
+        List<String> tagList = getTags();
+        Random random = new Random();
+        tags.add(tagList.get(random.nextInt(tagList.size())));
+        tags.add(tagList.get(random.nextInt(tagList.size())));
 
 
         for(int i=0;i<tags.size();i++){
@@ -130,4 +178,6 @@ public class AdServiceImpl implements AdService {
         return userCache;
 
     }
+
+
 }
